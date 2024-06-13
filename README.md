@@ -1,5 +1,7 @@
 # pacman
-Pac-Man
+A clone of the classical Pac-Man game
+
+The game runs entirely in the browser, and is served by a simple NodeJS backend which stores highscores and user stats in a MongoDB database.
 
 ## Install dependencies
 
@@ -19,40 +21,53 @@ npm run start
 npm run dev
 ```
 
+It assumes a mongodb server running locally.
+
 ## Create Application Container Image
 
-### Docker Container Image
+### Container Image
 
 The [Dockerfile](docker/Dockerfile) performs the following steps:
 
-1. It is based on Node.js LTS Version 6 (Boron).
-1. It then clones the Pac-Man game into the configured application directory.
-1. Exposes port 8080 for the web server.
-1. Starts the Node.js application using `npm start`.
+1. It uses the ubi9/nodejs-18-minimal from Red Hat as base image.
+1. It clones the Pac-Man game (static files and code of backend) into the configured application directory.
+1. It exposes port 8080 for the web server.
+1. It starts the Node.js application using `npm start`.
 
 To build the image run:
 
 ```
 cd docker
-docker build -t <registry>/<user>/pacman-nodejs-app .
+podman build -t <registry>/<user>/pacman-nodejs-app .
 ```
 
-You can test the image by running:
+You can test it by running:
 
 ```
-docker run -p 8000:8080 <registry>/<user>/pacman-nodejs-app
+podman create --name pacman -p 8080:8080 --pod new:pacman-app <registry>/<user>/pacman-nodejs-app
+podman create pod --name mongo --pod pacman-app docker.io/bitnami/mongodb:latest
+podman pod start pacman-app
 ```
+This will start a mongodb instance and the pacman webapp as two container images running in the same pod.
 
-And going to `http://localhost:8000/` to see if you get the Pac-Man game.
+Go to `http://localhost:8000/` to see if you get the Pac-Man game.
 
 Once you're satisfied you can push the image to the container registry.
 
 ```
-docker push <registry>/<user>/pacman-nodejs-app
+podman push <registry>/<user>/pacman-nodejs-app
 ```
 
 ### Building using an s2i image
 
 ```
-s2i build . centos/nodejs-6-centos7 pacman
+s2i build . ubi9/nodejs-18-minimal pacman
 ```
+
+## Credentials
+
+Originally written by [platzh1rsch](http://platzh1rsch.ch) and modified by [Ivan Font](http://ivanfont.com). 
+You can get the original code [here](https://github.com/platzhersh/pacman-canvas) 
+or the original modified version [here](https://github.com/font/pacman).
+
+NodeJS backend updated and refactored by François Charette ([this repo](https://github.com/fc7/pacman)).
