@@ -1,19 +1,12 @@
-FROM node:boron
-
-MAINTAINER Ivan Font <ifont@redhat.com>
-
-# Create app directory
-RUN mkdir -p /usr/src/app
+FROM registry.access.redhat.com/ubi9/nodejs-18-minimal
 WORKDIR /usr/src/app
+COPY --chown=1001:1001 src src
+COPY --chown=1001:1001 public public
+COPY --chown=1001:1001 views views
+COPY --chown=1001:1001 package*.json ./
+RUN npm install --omit dev
 
-# Clone game source code
-RUN git clone https://github.com/font/pacman.git .
-
-# Install app dependencies
-RUN npm install
-
-# Expose port 8080
+ENV NODE_ENV=production
 EXPOSE 8080
 
-# Run container
 CMD ["npm", "start"]
