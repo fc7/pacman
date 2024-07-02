@@ -1,9 +1,10 @@
 // import http from 'http';
-// import https from 'https';
+import https from 'https';
 import express from "express";
 const router = express.Router();
-// import fs from 'fs';
+import fs from 'fs';
 import os from 'os';
+import axios from "axios";
 
 // middleware that is specific to this router
 router.use(function timeLog(req, res, next) {
@@ -11,447 +12,203 @@ router.use(function timeLog(req, res, next) {
     next();
 })
 
-router.get('/metadata', function(req, res, next) {
-    console.log('[GET /loc/metadata]');
-    var h = getHost();
-    console.log("request hostname is " + req.hostname);
-    var c = "on-prem";
-    var z = "unknown";
-    if (req.hostname.includes('aroapp.io')) {
-        c = "Azure";
-        z = "northeurope"
-    } else if (req.hostname.includes('redhatworkshops.io')) {
-        c = "GCP";
-        z = "europe-west4"
-    }
-    res.json({
-            cloud: c,
-            zone: z,
-            host: h
-            })
+router.get('/metadata', async (req, res, next) => {
 
-    // getCloudMetadata(function(c, z) {
-    //     console.log(`CLOUD: ${c}`);
-    //     console.log(`ZONE: ${z}`);
-    //     console.log(`HOST: ${h}`);
-    //     res.json({
-    //         cloud: c,
-    //         zone: z,
-    //         host: h
-    //     });
-    // });
+    // TODO make querying metadata providers optional by means of env variable
+    const functionChain = [
+        getK8sCloudMetadata,
+        getAWSCloudMetadata,
+        getAzureCloudMetadata,
+        getGCPCloudMetadata,
+        getOpenStackCloudMetadata,
+        getFallbackMetadata,
+    ];
+
+    const cloudMetaData = await getCloudMetadata(functionChain);
+
+    console.log(`cloudMetaData = ${cloudMetaData}`);
+
+    res.json(cloudMetaData);
 });
 
-function getHost() {
-    console.log('[getHost]');
-    var host = os.hostname();
-    console.log(`HOST: ${host}`);
-    return host;
+async function getCloudMetadata(functions) {
+    for (const func of functions) {
+        try {
+            console.log(`Trying ${func.name} ...`)
+            const result = await func();
+            if (result) {
+                console.log(`Function ${func.name} succeeded: ${result}`);
+                return result;
+            }
+        } catch (error) {
+            //console.error(`Error in function ${func.name}`);
+        }
+    }
 }
 
-// function getCloudMetadata(callback) {
-//     console.log('getCloudMetadata');
-//     // Query k8s node api
-//     getK8sCloudMetadata(function(err, c, z) {
-//         if (err) {
-//             // Try AWS next
-//             getAWSCloudMetadata(function(err, c, z) {
-//                 if (err) {
-//                     // Try Azure next
-//                     getAzureCloudMetadata(function(err, c, z) {
-//                         if (err) {
-//                             // Try GCP next
-//                             getGCPCloudMetadata(function(err, c, z) {
-//                                 if (err) {
-//                                     // Try Openstack next
-//                                     getOpenStackCloudMetadata(function(err, c, z) {
-//                                         // Return result regardless of error
-//                                         callback(c, z); // Running in OpenStack or unknown
-//                                     });
-//                                 } else {
-//                                     callback(c, z); // Running in GCP
-//                                 }
-//                             });
-//                         } else {
-//                             callback(c, z); // Running in Azure
-//                         }
-//                     });
-//                 } else {
-//                     callback(c, z); // Running in AWS
-//                 }
-//             });
-//         } else {
-//             callback(c, z); // Running against k8s api
-//         }
-//     });
-// }
-
-// function getOpenStackCloudMetadata(callback) {
-//     console.log('getOpenStackCloudMetadata');
-//     // Set options to retrieve OpenStack zone for instance
-//     var osOptions = {
-//         hostname: '169.254.169.254',
-//         port: 80,
-//         path: '/openstack/latest/meta_data.json',
-//         method: 'GET',
-//         timeout: 10000,
-//     };
-
-//     var cloudName = 'unknown',
-//         zone = 'unknown';
-
-//     var req = http.request(osOptions, (metadataRes) => {
-//         let error;
-
-//         if (metadataRes.statusCode !== 200) {
-//             error = new Error(`Request Failed.\n` +
-//                 `Status Code: ${metadataRes.statusCode}`);
-//         }
-
-//         if (error) {
-//             console.log(error.message);
-//             // consume response data to free up memory
-//             metadataRes.resume();
-//             callback(error, cloudName, zone);
-//             return;
-//         }
-
-//         console.log(`STATUS: ${metadataRes.statusCode}`);
-//         console.log(`HEADERS: ${JSON.stringify(metadataRes.headers)}`);
-//         metadataRes.setEncoding('utf8');
-
-//         var metaData;
-
-//         metadataRes.on('data', (chunk) => {
-//             console.log(`BODY: ${chunk}`);
-//             metaData = JSON.parse(chunk);
-//         });
-
-//         metadataRes.on('end', () => {
-//             console.log('No more data in response.');
-//             cloudName = 'OpenStack'; // Request was successful
-//             zone = metaData.availability_zone;
-
-//             // use extra metadata to identify the cloud if available
-//             if (metaData.meta) {
-//                 clusterId = metaData.meta.clusterid;
-//                 if (clusterId) {
-//                     cloudName += ' - ' + clusterId.split('.')[0];
-//                 }
-//             }
-
-//             console.log(`CLOUD: ${cloudName}`);
-//             console.log(`ZONE: ${zone}`);
-
-//             // return CLOUD and ZONE data
-//             callback(null, cloudName, zone);
-//         });
-
-//     });
-
-//     req.on('error', (e) => {
-//         console.log(`problem with request: ${e.message}`);
-//         // return CLOUD and ZONE data
-//         callback(e, cloudName, zone);
-//     });
-
-//     // End request
-//     req.end();
-// }
-
-// function getAWSCloudMetadata(callback) {
-//     console.log('getAWSCloudMetadata');
-//     // Set options to retrieve AWS zone for instance
-//     var awsOptions = {
-//         hostname: '169.254.169.254',
-//         port: 80,
-//         path: '/latest/meta-data/placement/availability-zone',
-//         method: 'GET',
-//         timeout: 10000,
-//     };
-
-//     var cloudName = 'unknown',
-//         zone = 'unknown';
-
-//     var req = http.request(awsOptions, (zoneRes) => {
-//         let error;
-
-//         if (zoneRes.statusCode !== 200) {
-//             error = new Error(`Request Failed.\n` +
-//                 `Status Code: ${zoneRes.statusCode}`);
-//         }
-
-//         if (error) {
-//             console.log(error.message);
-//             // consume response data to free up memory
-//             zoneRes.resume();
-//             callback(error, cloudName, zone);
-//             return;
-//         }
-
-//         console.log(`STATUS: ${zoneRes.statusCode}`);
-//         console.log(`HEADERS: ${JSON.stringify(zoneRes.headers)}`);
-//         zoneRes.setEncoding('utf8');
-
-//         zoneRes.on('data', (chunk) => {
-//             console.log(`BODY: ${chunk}`);
-//             zone = chunk;
-//         });
-
-//         zoneRes.on('end', () => {
-//             console.log('No more data in response.');
-//             cloudName = 'AWS'; // Request was successful
-
-//             // get the zone substring in uppercase
-//             var zoneSplit = zone.split('/');
-//             zone = zoneSplit[zoneSplit.length - 1].toLowerCase();
-//             console.log(`CLOUD: ${cloudName}`);
-//             console.log(`ZONE: ${zone}`);
-
-//             // return CLOUD and ZONE data
-//             callback(null, cloudName, zone);
-//         });
-
-//     });
-
-//     req.on('error', (e) => {
-//         console.log(`problem with request: ${e.message}`);
-//         // return CLOUD and ZONE data
-//         callback(e, cloudName, zone);
-//     });
-
-//     // End request
-//     req.end();
-// }
-
-// function getAzureCloudMetadata(callback) {
-//     console.log('getAzureCloudMetadata');
-//     // Set options to retrieve Azure zone for instance
-//     var azureOptions = {
-//         hostname: '169.254.169.254',
-//         port: 80,
-//         path: '/metadata/instance/compute/location?api-version=2017-04-02&format=text',
-//         method: 'GET',
-//         timeout: 10000,
-//         headers: {
-//             'Metadata': 'true'
-//         }
-//     };
-
-//     var cloudName = 'unknown',
-//         zone = 'unknown';
-
-//     var req = http.request(azureOptions, (zoneRes) => {
-//         let error;
-
-//         if (zoneRes.statusCode !== 200) {
-//             error = new Error(`Request Failed.\n` +
-//                 `Status Code: ${zoneRes.statusCode}`);
-//         }
-
-//         if (error) {
-//             console.log(error.message);
-//             // consume response data to free up memory
-//             zoneRes.resume();
-//             callback(error, cloudName, zone);
-//             return;
-//         }
-
-//         console.log(`STATUS: ${zoneRes.statusCode}`);
-//         console.log(`HEADERS: ${JSON.stringify(zoneRes.headers)}`);
-//         zoneRes.setEncoding('utf8');
-
-//         zoneRes.on('data', (chunk) => {
-//             console.log(`BODY: ${chunk}`);
-//             zone = chunk;
-//         });
-
-//         zoneRes.on('end', () => {
-//             console.log('No more data in response.');
-//             cloudName = 'Azure'; // Request was successful
-
-//             // get the zone substring in uppercase
-//             var zoneSplit = zone.split('/');
-//             zone = zoneSplit[zoneSplit.length - 1].toLowerCase();
-//             console.log(`CLOUD: ${cloudName}`);
-//             console.log(`ZONE: ${zone}`);
-
-//             // return CLOUD and ZONE data
-//             callback(null, cloudName, zone);
-//         });
-
-//     });
-
-//     req.on('error', (e) => {
-//         console.log(`problem with request: ${e.message}`);
-//         // return CLOUD and ZONE data
-//         callback(e, cloudName, zone);
-//     });
-
-//     // End request
-//     req.end();
-// }
-
-// function getGCPCloudMetadata(callback) {
-//     console.log('getGCPCloudMetadata');
-//     // Set options to retrieve GCE zone for instance
-//     var gcpOptions = {
-//         hostname: 'metadata.google.internal',
-//         port: 80,
-//         path: '/computeMetadata/v1/instance/zone',
-//         method: 'GET',
-//         timeout: 10000,
-//         headers: {
-//             'Metadata-Flavor': 'Google'
-//         }
-//     };
-
-//     var cloudName = 'unknown',
-//         zone = 'unknown';
-
-//     var req = http.request(gcpOptions, (zoneRes) => {
-//         let error;
-
-//         if (zoneRes.statusCode !== 200) {
-//             error = new Error(`Request Failed.\n` +
-//                 `Status Code: ${zoneRes.statusCode}`);
-//         }
-
-//         if (error) {
-//             console.log(error.message);
-//             // consume response data to free up memory
-//             zoneRes.resume();
-//             callback(error, cloudName, zone);
-//             return;
-//         }
-
-//         console.log(`STATUS: ${zoneRes.statusCode}`);
-//         console.log(`HEADERS: ${JSON.stringify(zoneRes.headers)}`);
-//         zoneRes.setEncoding('utf8');
-
-//         zoneRes.on('data', (chunk) => {
-//             console.log(`BODY: ${chunk}`);
-//             zone = chunk;
-//         });
-
-//         zoneRes.on('end', () => {
-//             console.log('No more data in response.');
-//             cloudName = 'GCP'; // Request was successful
-
-//             // get the zone substring in uppercase
-//             var zoneSplit = zone.split('/');
-//             zone = zoneSplit[zoneSplit.length - 1].toLowerCase();
-//             console.log(`CLOUD: ${cloudName}`);
-//             console.log(`ZONE: ${zone}`);
-
-//             // return CLOUD and ZONE data
-//             callback(null, cloudName, zone);
-//         });
-
-//     });
-
-//     req.on('error', (e) => {
-//         console.log(`problem with request: ${e.message}`);
-//         // return CLOUD and ZONE data
-//         callback(e, cloudName, zone);
-//     });
-
-//     // End request
-//     req.end();
-// }
-
-// function getK8sCloudMetadata(callback) {
-//     console.log('getK8sCloudMetadata');
-//     // Set options to retrieve k8s api information
-//     var node_name = process.env.MY_NODE_NAME;
-//     console.log('Querying ' + node_name + ' for cloud data');
-
-//     try {
-//         var sa_token = fs.readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/token');
-//         var ca_file = fs.readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/ca.crt');
-//     } catch (err) {
-//         console.log(err)
-//     }
-
-//     var headers = {
-//         'Authorization': `Bearer ${sa_token}`
-//     };
-
-//     var genericOptions = {
-//         host: 'kubernetes.default.svc',
-//         port: 443,
-//         path: `/api/v1/nodes/${node_name}`,
-//         timeout: 10000,
-//         ca: ca_file,
-//         headers: headers,
-//     };
-
-//     var cloudName = 'unknown',
-//         zone = 'unknown';
-
-//     var req = https.request(genericOptions, (zoneRes) => {
-//         let error;
-
-//         if (zoneRes.statusCode !== 200) {
-//             error = new Error(`Request Failed.\n` +
-//                 `Status Code: ${zoneRes.statusCode}`);
-//         }
-
-//         if (error) {
-//             console.log(error.message);
-//             // consume response data to free up memory
-//             zoneRes.resume();
-//             callback(error, cloudName, zone);
-//             return;
-//         }
-
-//         console.log(`STATUS: ${zoneRes.statusCode}`);
-//         console.log(`HEADERS: ${JSON.stringify(zoneRes.headers)}`);
-//         zoneRes.setEncoding('utf8');
-
-//         var body = [];
-
-//         zoneRes.on('data', (chunk) => {
-//             body.push(chunk);
-//         });
-//         zoneRes.on('end', () => {
-//             var metaData = JSON.parse(body.join(''));
-//             console.log(`RESULT: ${metaData}`);
-//             console.log('No more data in response.');
-
-//             if (metaData.spec.providerID) {
-//                 var provider = metaData.spec.providerID;
-//                 cloudName = String(provider.split(":", 1)); // Split on providerID if request was successful
-//             }
-
-//             // use the annotation  to identify the zone if available
-//             if (metaData.metadata.labels['failure-domain.beta.kubernetes.io/zone']) {
-//                 zone = metaData.metadata.labels['failure-domain.beta.kubernetes.io/zone'].toLowerCase();
-
-//             }
-//             // return CLOUD and ZONE data
-//             if (cloudName == "unknown") {
-//                 error = new Error(`CloudName not found on node Spec`);
-//                 console.log(error);
-//                 callback(error, cloudName, zone);
-//             }
-//             else {
-//                 console.log(`CLOUD: ${cloudName}`);
-//                 console.log(`ZONE: ${zone}`);
-//                 callback(null, cloudName, zone);
-//             }
-//         });
-
-//     });
-
-//     req.on('error', (e) => {
-//         console.log(`problem with request: ${e.message}`);
-//         // return CLOUD and ZONE data
-//         callback(e, cloudName, zone);
-//     });
-
-//     // End request
-//     req.end();
-// }
+const getOpenStackCloudMetadata = async () => {
+
+    const instance = axios.create({
+        baseUrl: "http://169.254.169.254",
+        timeout: 10000
+    });
+
+    const openStackInfo = await instance.get('/openstack/latest/meta_data.json');
+    const cloudName = 'OpenStack';
+    if (openStackInfo.meta) {
+        clusterId = openStackInfo.meta.clusterid;
+        if (clusterId) {
+            cloudName += ' - ' + clusterId.split('.')[0];
+        }
+    }
+
+    return {
+        cloud: cloudName,
+        zone: openStackInfo.availability_zone || 'unknown'
+    }
+}
+
+const getAWSCloudMetadata = async () => {
+
+    const instance = axios.create({
+        baseUrl: "http://169.254.169.254",
+        timeout: 10000,
+        responseType: 'text'
+    });
+
+    // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
+    const apiToken = await instance.put('/latest/api/token', {
+        headers: {
+            'X-aws-ec2-metadata-token-ttl-seconds': '21600'
+        }
+    });
+
+    const zoneInfo = await instance.get('/latest/meta-data/placement/availability-zone', {
+        headers: {
+            'X-aws-ec2-metadata-token': apiToken
+        }
+    });
+    const zone = zoneInfo.split('/').pop().toLowerCase();
+
+    return {
+        cloud: 'AWS',
+        zone: zone,
+    }
+}
+
+const getAzureCloudMetadata = async () => {
+    const instance = axios.create({
+        baseUrl: "http://169.254.169.254",
+        headers: {
+            'Metadata': 'true'
+        },
+        timeout: 10000,
+        responseType: 'json'
+    });
+
+    const azureInfo = await instance.get('/metadata/instance?api-version=2021-02-01');
+
+    const zone = azureInfo.compute.zone || 'unknown';
+
+    return {
+        cloud: 'Azure',
+        zone: zone,
+    }
+}
+
+const getGCPCloudMetadata = async () =>  {
+
+    const instance = axios.create({
+        baseUrl: "http://metadata.google.internal",
+        headers: {
+            'Metadata-Flavor': 'Google'
+        },
+        timeout: 10000,
+        responseType: 'text'
+    });
+
+    const gcpZoneInfo = await instance.get('/computeMetadata/v1/instance/zone');
+
+    const zone = gcpZoneInfo.split('/').pop().toLowerCase();
+
+    return {
+        cloud: 'GCP',
+        zone: zone,
+    }
+}
+
+const getK8sCloudMetadata = async () => {
+
+    const cloudName = 'unknown',
+        zoneName = 'unknown';
+
+    const podName = os.hostname();
+    if (!fs.existsSync('/var/run/secrets/kubernetes.io/serviceaccount')) {
+        throw new Error("No service account detected. Probably not running in Kubernetes");
+    }
+
+    const sa_token = fs.readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/token');
+    const ca_file = fs.readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/ca.crt');
+    const instance = axios.create({
+        httpsAgent: new https.Agent({ ca: ca_file }),
+        headers: {
+            'Authorization': `Bearer ${sa_token}`
+        },
+        baseUrl: "https://kubernetes.default.svc.cluster.local",
+        timeout: 10000
+    });
+
+    const k8sNodesInfo = await instance.get('/api/v1/nodes');
+    const k8snode = k8sNodesInfo.items[0];
+    const nodeName = k8snode.metadata.name || 'unknown';
+    if (nodeName == 'unknown' && k8snode.metadata.labels['kubernetes.io/hostname']) {
+        nodeName = k8snode.metadata.labels['kubernetes.io/hostname'];
+    }
+    console.log(`On Kubernetes Node ${nodeName}`);
+
+    if (k8snode.spec.providerID) {
+        cloudName = k8snode.spec.providerID.split(":")[0];
+    } else {
+        console.log('Trying OpenShift API ...')
+        try {
+            const openShiftClusterInfo = await instance.get('/apis/config.openshift.io/v1/infrastructures/cluster');
+            if (openShiftClusterInfo.spec.platformSpec.type) {
+                cloudName = openShiftClusterInfo.spec.platformSpec.type
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }
+    console.log(`Found providerID ${cloudName}`);
+
+    if (k8snode.metadata.labels['topology.kubernetes.io/zone']) {
+        // https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone
+        zoneName = k8snode.metadata.labels['topology.kubernetes.io/zone']
+    } // only set by OVN
+    else if (k8snode.metadata.annotations['k8s.ovn.org/zone-name']) {
+        zoneName = k8snode.metadata.annotations['k8s.ovn.org/zone-name'];
+    }
+    else if (k8snode.metadata.labels['failure-domain.beta.kubernetes.io/zone']) {
+        // https://kubernetes.io/docs/reference/labels-annotations-taints/#failure-domainbetakubernetesiozone DEPRECATED
+        zoneName = k8snode.metadata.labels['failure-domain.beta.kubernetes.io/zone']
+    }
+    console.log(`Found Zone ${zoneName}`);
+
+    return {
+        host: nodeName,
+        cloud: cloudName,
+        zone: zoneName,
+        pod: podName
+    }
+
+}
+
+const getFallbackMetadata = async () => {
+    return {
+        host: os.hostname(),
+        cloud: 'on-prem',
+        zone: 'unknown'
+    }
+}
 
 export default router
