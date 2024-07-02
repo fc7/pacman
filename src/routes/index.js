@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import user from './user.js';
 import highscores from './highscores.js';
-import cloudmedatada from './location.js';
+import cloudmedatada from './cloudmetadata.js';
 const router = Router();
 
 router.use('/user', user);
