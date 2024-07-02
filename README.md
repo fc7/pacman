@@ -45,7 +45,7 @@ You can test it by running:
 
 ```
 podman create --name pacman -p 8080:8080 --pod new:pacman-app <registry>/<user>/pacman-nodejs-app
-podman create pod --name mongo --pod pacman-app docker.io/bitnami/mongodb:latest
+podman create --name mongo --pod pacman-app docker.io/bitnami/mongodb:5.0.14
 podman pod start pacman-app
 ```
 This will start a mongodb instance and the pacman webapp as two container images running in the same pod.
