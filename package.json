@@ -1,6 +1,6 @@
 {
   "name": "pacman",
-  "version": "0.0.2",
+  "version": "0.1.1",
   "description": "Pac-Man Node.js Game",
   "author": "Ivan Font <ivan@ivanfont.com>",
   "type": "module",
