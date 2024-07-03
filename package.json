@@ -1,12 +1,13 @@
 {
   "name": "pacman",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "Pac-Man Node.js Game",
   "author": "Ivan Font <ivan@ivanfont.com>",
   "type": "module",
   "main": "app.js",
   "scripts": {
     "start": "node src/app.js",
+    "debug": "node --inspect src/app.js",
     "dev": "nodemon ."
   },
   "license": "GPLv3",

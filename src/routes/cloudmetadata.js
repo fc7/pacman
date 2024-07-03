@@ -1,4 +1,3 @@
-// import http from 'http';
 import https from 'https';
 import express from "express";
 const router = express.Router();
@@ -14,7 +13,6 @@ router.use(function timeLog(req, res, next) {
 
 router.get('/metadata', async (req, res, next) => {
 
-    // TODO make querying metadata providers optional by means of env variable
     const functionChain = [
         getK8sCloudMetadata,
         getAWSCloudMetadata,
@@ -26,7 +24,7 @@ router.get('/metadata', async (req, res, next) => {
 
     const cloudMetaData = await getCloudMetadata(functionChain);
 
-    console.log(`cloudMetaData = ${cloudMetaData}`);
+    console.log('cloudMetaData = ', cloudMetaData);
 
     res.json(cloudMetaData);
 });
@@ -37,26 +35,24 @@ async function getCloudMetadata(functions) {
             console.log(`Trying ${func.name} ...`)
             const result = await func();
             if (result) {
-                console.log(`Function ${func.name} succeeded: ${result}`);
+                console.log(`Function ${func.name} succeeded`);
                 return result;
             }
         } catch (error) {
-            //console.error(`Error in function ${func.name}`);
+            console.error(`Error in function ${func.name}: ${error.message}`);
         }
     }
 }
 
 const getOpenStackCloudMetadata = async () => {
 
-    const instance = axios.create({
-        baseUrl: "http://169.254.169.254",
-        timeout: 10000
+    const response = await axios.get('http://169.254.169.254/openstack/latest/meta_data.json', {
+        timeout: 10000,
+        responseType: 'json'
     });
-
-    const openStackInfo = await instance.get('/openstack/latest/meta_data.json');
     const cloudName = 'OpenStack';
-    if (openStackInfo.meta) {
-        clusterId = openStackInfo.meta.clusterid;
+    if (response.data.meta) {
+        clusterId = response.data.meta.clusterid;
         if (clusterId) {
             cloudName += ' - ' + clusterId.split('.')[0];
         }
@@ -64,31 +60,29 @@ const getOpenStackCloudMetadata = async () => {
 
     return {
         cloud: cloudName,
-        zone: openStackInfo.availability_zone || 'unknown'
+        zone: response.data.availability_zone || 'Unknown'
     }
 }
 
 const getAWSCloudMetadata = async () => {
 
-    const instance = axios.create({
-        baseUrl: "http://169.254.169.254",
-        timeout: 10000,
-        responseType: 'text'
-    });
-
     // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
-    const apiToken = await instance.put('/latest/api/token', {
+    const tokenResponse = await axios.put('http://169.254.169.254/latest/api/token', {
         headers: {
             'X-aws-ec2-metadata-token-ttl-seconds': '21600'
-        }
+        },
+        responseType: 'text',
+        timeout: 10000
     });
 
-    const zoneInfo = await instance.get('/latest/meta-data/placement/availability-zone', {
+    const zoneResponse = await axios.get('http://169.254.169.254/latest/api/token/latest/meta-data/placement/availability-zone', {
         headers: {
-            'X-aws-ec2-metadata-token': apiToken
-        }
+            'X-aws-ec2-metadata-token': tokenResponse.data
+        },
+        responseType: 'text',
+        timeout: 10000
     });
-    const zone = zoneInfo.split('/').pop().toLowerCase();
+    const zone = zoneResponse.data.split('/').pop().toLowerCase();
 
     return {
         cloud: 'AWS',
@@ -97,8 +91,8 @@ const getAWSCloudMetadata = async () => {
 }
 
 const getAzureCloudMetadata = async () => {
-    const instance = axios.create({
-        baseUrl: "http://169.254.169.254",
+   
+    const azureResponse = await axios.get('http://169.254.169.254/metadata/instance?api-version=2021-02-01', {
         headers: {
             'Metadata': 'true'
         },
@@ -106,9 +100,7 @@ const getAzureCloudMetadata = async () => {
         responseType: 'json'
     });
 
-    const azureInfo = await instance.get('/metadata/instance?api-version=2021-02-01');
-
-    const zone = azureInfo.compute.zone || 'unknown';
+    const zone = azureResponse.data.compute.zone || 'Unknown';
 
     return {
         cloud: 'Azure',
@@ -118,8 +110,7 @@ const getAzureCloudMetadata = async () => {
 
 const getGCPCloudMetadata = async () =>  {
 
-    const instance = axios.create({
-        baseUrl: "http://metadata.google.internal",
+    const gcpZoneResponse = await axios.get('http://metadata.google.internal/computeMetadata/v1/instance/zone', {
         headers: {
             'Metadata-Flavor': 'Google'
         },
@@ -127,9 +118,7 @@ const getGCPCloudMetadata = async () =>  {
         responseType: 'text'
     });
 
-    const gcpZoneInfo = await instance.get('/computeMetadata/v1/instance/zone');
-
-    const zone = gcpZoneInfo.split('/').pop().toLowerCase();
+    const zone = gcpZoneResponse.data.split('/').pop().toLowerCase();
 
     return {
         cloud: 'GCP',
@@ -139,12 +128,13 @@ const getGCPCloudMetadata = async () =>  {
 
 const getK8sCloudMetadata = async () => {
 
-    const cloudName = 'unknown',
-        zoneName = 'unknown';
+    let cloudName = 'On-prem',
+        zoneName = 'Unknown';
 
-    const podName = os.hostname();
     if (!fs.existsSync('/var/run/secrets/kubernetes.io/serviceaccount')) {
-        throw new Error("No service account detected. Probably not running in Kubernetes");
+        const msg = "No service account detected. Probably not running in Kubernetes";
+        console.error(msg);
+        throw new Error(msg);
     }
 
     const sa_token = fs.readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/token');
@@ -154,14 +144,14 @@ const getK8sCloudMetadata = async () => {
         headers: {
             'Authorization': `Bearer ${sa_token}`
         },
-        baseUrl: "https://kubernetes.default.svc.cluster.local",
         timeout: 10000
     });
 
-    const k8sNodesInfo = await instance.get('/api/v1/nodes');
-    const k8snode = k8sNodesInfo.items[0];
-    const nodeName = k8snode.metadata.name || 'unknown';
-    if (nodeName == 'unknown' && k8snode.metadata.labels['kubernetes.io/hostname']) {
+    const k8sResponse = await instance.get('https://kubernetes.default.svc.cluster.local/api/v1/nodes');
+    const k8snode = k8sResponse.data.items[0];
+    console.debug(`Node info = ${JSON.stringify(k8snode)}`);
+    const nodeName = k8snode.metadata.name || 'Unknown';
+    if (nodeName == 'Unknown' && k8snode.metadata.labels['kubernetes.io/hostname']) {
         nodeName = k8snode.metadata.labels['kubernetes.io/hostname'];
     }
     console.log(`On Kubernetes Node ${nodeName}`);
@@ -171,12 +161,13 @@ const getK8sCloudMetadata = async () => {
     } else {
         console.log('Trying OpenShift API ...')
         try {
-            const openShiftClusterInfo = await instance.get('/apis/config.openshift.io/v1/infrastructures/cluster');
-            if (openShiftClusterInfo.spec.platformSpec.type) {
-                cloudName = openShiftClusterInfo.spec.platformSpec.type
+            const openshiftClusterResponse = await instance.get('https://kubernetes.default.svc.cluster.local/apis/config.openshift.io/v1/infrastructures/cluster');
+            console.debug(`OpenShift Cluster Info = ${JSON.stringify(openshiftClusterResponse.data)}`);
+            if (openshiftClusterResponse.data.spec.platformSpec.type && openshiftClusterResponse.data.spec.platformSpec.type != 'None') {
+                cloudName = openshiftClusterResponse.data.spec.platformSpec.type
             }
         } catch (error) {
-            console.error(error);
+            // console.error(error);
         }
     }
     console.log(`Found providerID ${cloudName}`);
@@ -195,10 +186,10 @@ const getK8sCloudMetadata = async () => {
     console.log(`Found Zone ${zoneName}`);
 
     return {
-        host: nodeName,
+        host: os.hostname(),
         cloud: cloudName,
         zone: zoneName,
-        pod: podName
+        node: nodeName
     }
 
 }
@@ -206,8 +197,8 @@ const getK8sCloudMetadata = async () => {
 const getFallbackMetadata = async () => {
     return {
         host: os.hostname(),
-        cloud: 'on-prem',
-        zone: 'unknown'
+        cloud: 'On-prem',
+        zone: 'Unknown'
     }
 }
 
