@@ -47,7 +47,7 @@ async function getCloudMetadata(functions) {
 const getOpenStackCloudMetadata = async () => {
 
     const response = await axios.get('http://169.254.169.254/openstack/latest/meta_data.json', {
-        timeout: 10000,
+        timeout: 5000,
         responseType: 'json'
     });
     const cloudName = 'OpenStack';
@@ -72,7 +72,7 @@ const getAWSCloudMetadata = async () => {
             'X-aws-ec2-metadata-token-ttl-seconds': '21600'
         },
         responseType: 'text',
-        timeout: 10000
+        timeout: 5000
     });
 
     const zoneResponse = await axios.get('http://169.254.169.254/latest/api/token/latest/meta-data/placement/availability-zone', {
@@ -80,7 +80,7 @@ const getAWSCloudMetadata = async () => {
             'X-aws-ec2-metadata-token': tokenResponse.data
         },
         responseType: 'text',
-        timeout: 10000
+        timeout: 5000
     });
     const zone = zoneResponse.data.split('/').pop().toLowerCase();
 
@@ -96,7 +96,7 @@ const getAzureCloudMetadata = async () => {
         headers: {
             'Metadata': 'true'
         },
-        timeout: 10000,
+        timeout: 5000,
         responseType: 'json'
     });
 
@@ -114,7 +114,7 @@ const getGCPCloudMetadata = async () =>  {
         headers: {
             'Metadata-Flavor': 'Google'
         },
-        timeout: 10000,
+        timeout: 5000,
         responseType: 'text'
     });
 
@@ -144,7 +144,7 @@ const getK8sCloudMetadata = async () => {
         headers: {
             'Authorization': `Bearer ${sa_token}`
         },
-        timeout: 10000
+        timeout: 5000
     });
 
     const k8sResponse = await instance.get('https://kubernetes.default.svc.cluster.local/api/v1/nodes');
@@ -158,19 +158,20 @@ const getK8sCloudMetadata = async () => {
 
     if (k8snode.spec.providerID) {
         cloudName = k8snode.spec.providerID.split(":")[0];
+        console.log(`Found providerID ${cloudName}`);
     } else {
         console.log('Trying OpenShift API ...')
         try {
             const openshiftClusterResponse = await instance.get('https://kubernetes.default.svc.cluster.local/apis/config.openshift.io/v1/infrastructures/cluster');
             console.debug(`OpenShift Cluster Info = ${JSON.stringify(openshiftClusterResponse.data)}`);
             if (openshiftClusterResponse.data.spec.platformSpec.type && openshiftClusterResponse.data.spec.platformSpec.type != 'None') {
-                cloudName = openshiftClusterResponse.data.spec.platformSpec.type
+                cloudName = openshiftClusterResponse.data.spec.platformSpec.type;
+                console.log(`Found platform type: ${cloudName}`);
             }
         } catch (error) {
             // console.error(error);
         }
     }
-    console.log(`Found providerID ${cloudName}`);
 
     if (k8snode.metadata.labels['topology.kubernetes.io/zone']) {
         // https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone
