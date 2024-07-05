@@ -21,7 +21,11 @@ npm run start
 npm run dev
 ```
 
-It assumes a mongodb server running locally.
+It assumes a mongodb server running locally. The easiest way is to use a container, e.g.: 
+
+```
+podman run -d --name mongo -p 27017:27017 mongo:5.0.27
+```
 
 ## Create Application Container Image
 
@@ -37,15 +41,14 @@ The [Dockerfile](docker/Dockerfile) performs the following steps:
 To build the image run:
 
 ```
-cd docker
-podman build -t <registry>/<user>/pacman-nodejs-app .
+podman build -t <registry>/<user>/pacman-app .
 ```
 
 You can test it by running:
 
 ```
-podman create --name pacman -p 8080:8080 --pod new:pacman-app <registry>/<user>/pacman-nodejs-app
-podman create --name mongo --pod pacman-app docker.io/bitnami/mongodb:5.0.14
+podman create --name pacman -p 8080:8080 --pod new:pacman-app <registry>/<user>/pacman-app
+podman create --name mongo --pod pacman-app mongo:5.0.27
 podman pod start pacman-app
 ```
 This will start a mongodb instance and the pacman webapp as two container images running in the same pod.
