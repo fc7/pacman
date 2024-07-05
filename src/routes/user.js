@@ -25,7 +25,7 @@ const UserStats = new db.model('UserStats', userStatSchema);
     
 
 // create application/x-www-form-urlencoded parser
-var urlencodedParser = bodyParser.urlencoded({ extended: false })
+const urlencodedParser = bodyParser.urlencoded({ extended: false })
 
 // middleware that is specific to this router
 router.use(function timeLog (req, res, next) {
@@ -36,7 +36,7 @@ router.use(function timeLog (req, res, next) {
 router.get('/id', async (req, res) => {
     console.log('[GET /user/id]');
 
-    let emptyUserStats = new UserStats({
+    const emptyUserStats = new UserStats({
         date: Date()
     });
 
@@ -53,7 +53,7 @@ router.post('/stats', urlencodedParser, async (req, res, next) => {
                 ' user-agent =', req.headers['user-agent'],
                 ' referer =', req.headers.referer);
 
-    var userScore = parseInt(req.body.score, 10),
+    let userScore = parseInt(req.body.score, 10),
         userLevel = parseInt(req.body.level, 10),
         userLives = parseInt(req.body.lives, 10),
         userET = parseInt(req.body.elapsedTime, 10);
@@ -86,7 +86,7 @@ router.get('/stats', async (req, res, next) => {
     // Find all elements where the score field exists to avoid
     // undefined values
     UserStats.find({score: { $exists: true }}).sort({score: -1}).then(docs => {
-        var resp = [];
+        let resp = [];
         
         docs.forEach( item => {
             resp.push({

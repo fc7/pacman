@@ -1,10 +1,10 @@
-var service_host = '127.0.0.1'
-var auth_details = ''
-var mongo_database = 'pacman'
-var mongo_port = '27017'
-var use_ssl = false
-var validate_ssl = true
-var connection_details = ''
+let service_host = '127.0.0.1'
+let auth_details = ''
+let mongo_database = 'pacman'
+let mongo_port = '27017'
+let use_ssl = false
+let validate_ssl = true
+let connection_details = ''
 
 if (process.env.MONGO_SERVICE_HOST) {
     service_host = process.env.MONGO_SERVICE_HOST
@@ -36,7 +36,7 @@ if (process.env.MONGO_AUTH_USER && process.env.MONGO_AUTH_PWD) {
     auth_details = `${process.env.MONGO_AUTH_USER}:${process.env.MONGO_AUTH_PWD}@`
 }
 
-var hosts = service_host.split(',')
+let hosts = service_host.split(',')
 
 for (let i = 0; i < hosts.length; i++) {
     connection_details += `${hosts[i]}:${mongo_port},`

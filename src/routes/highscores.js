@@ -20,7 +20,7 @@ const highScoreSchema = new db.Schema({
 const Highscore = new db.model('Highscore', highScoreSchema);
 
 // create application/x-www-form-urlencoded parser
-var urlencodedParser = bodyParser.urlencoded({ extended: false })
+const urlencodedParser = bodyParser.urlencoded({ extended: false })
 
 // middleware that is specific to this router
 router.use(function timeLog (req, res, next) {
