@@ -57,7 +57,7 @@ app.listen(port, err => {
  */
 
 function normalizePort(val) {
-    var port = parseInt(val, 10);
+    var port = Number(val);
 
     if (isNaN(port)) {
         // named pipe
