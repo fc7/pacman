@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/on-event: "[pull_request, push]"
 
     # The branch or tag we are targeting (ie: main, refs/tags/*)
-    pipelinesascode.tekton.dev/on-target-branch: "[main]"
+    pipelinesascode.tekton.dev/on-target-branch: "[master]"
 
     # Fetch the git-clone task from hub, we are able to reference later on it
     # with taskRef and it will automatically be embedded into our pipeline.
@@ -75,7 +75,7 @@ spec:
         workspaces:
           - name: source
             workspace: source
-          - name: dockerconfig
+          - name: build-and-push
             workspace: dockerconfig-ws
       # - name: run-test
       #   taskRef:
@@ -103,6 +103,7 @@ spec:
     # - name: basic-auth
     #   secret:
     #     secretName: "{{ git_auth_secret }}"
+    # This is needed to be able to push to quay.io:
     - name: dockerconfig-ws
       secret:
         secretName: container-registry-secret    
