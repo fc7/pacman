@@ -15,8 +15,8 @@ metadata:
     # with taskRef and it will automatically be embedded into our pipeline.
     pipelinesascode.tekton.dev/task: "git-clone"
 
-    # Task for Nodejs
-    pipelinesascode.tekton.dev/task-1: "[npm]"
+    # Task for buildah
+    pipelinesascode.tekton.dev/task-1: "buildah"
 
     # You can add more tasks by increasing the suffix number, you can specify them as array to have multiple of them.
     # browse the tasks you want to include from hub on https://hub.tekton.dev/
@@ -36,7 +36,6 @@ spec:
     - name: DOCKERFILE_PATH
       value: ./Containerfile
     - name: IMAGE_NAME
-      # FIXME use secret for quay.io https://redhat-scholars.github.io/tekton-tutorial/tekton-tutorial/private_reg_repos.html#tekton-push-to-external-reg
       value: quay.io/rh_ee_fcharett/pacman:0.1.5 
   pipelineSpec:
     params:
@@ -52,8 +51,8 @@ spec:
         workspaces:
           - name: output
             workspace: source
-          - name: basic-auth
-            workspace: basic-auth
+        # - name: basic-auth
+        #   workspace: basic-auth
         params:
           - name: url
             value: $(params.repo_url)
@@ -75,7 +74,9 @@ spec:
             value: 'true'
         workspaces:
           - name: source
-            workspace: source       
+            workspace: source
+          - name: dockerconfig
+            workspace: dockerconfig-ws
       # - name: run-test
       #   taskRef:
       #     name: npm
@@ -99,6 +100,9 @@ spec:
               storage: 1Gi
     # This workspace will inject secret to help the git-clone task to be able to
     # checkout the private repositories
-    - name: basic-auth
+    # - name: basic-auth
+    #   secret:
+    #     secretName: "{{ git_auth_secret }}"
+    - name: dockerconfig-ws
       secret:
-        secretName: "{{ git_auth_secret }}"
+        secretName: container-registry-secret    
