@@ -62,9 +62,9 @@ spec:
           - name: basic-auth
             workspace: basic-auth
         params:
-          - name: url
+          - name: URL
             value: $(params.repo_url)
-          - name: revision
+          - name: REVISION
             value: $(params.revision)
       - name: build-image
         runAfter:
@@ -83,7 +83,7 @@ spec:
             value: $(params.DOCKERFILE_PATH)
           - name: IMAGE
             value: $(params.IMAGE_NAME)
-          - name: TLSVERIFY
+          - name: TLS_VERIFY
             value: 'false'
           - name: SKIP_PUSH
             value: 'true'
