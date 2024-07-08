@@ -86,12 +86,12 @@ spec:
           - name: TLS_VERIFY
             value: 'false'
           - name: SKIP_PUSH
-            value: 'true'
+            value: 'false'
         workspaces:
           - name: source
             workspace: source
-          # - name: dockerconfig
-          #   workspace: dockerconfig
+          - name: dockerconfig
+            workspace: dockerconfig
       # - name: run-test
       #   taskRef:
       #     name: npm
@@ -119,6 +119,6 @@ spec:
       secret:
         secretName: "{{ git_auth_secret }}"
     # This is needed to be able to push to quay.io:
-    # - name: dockerconfig
-    #   secret:
-    #     secretName: container-registry-secret    
+    - name: dockerconfig
+      secret:
+        secretName: container-registry-secret
