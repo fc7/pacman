@@ -16,7 +16,7 @@ metadata:
     pipelinesascode.tekton.dev/task: "git-clone"
 
     # Task for buildah
-    pipelinesascode.tekton.dev/task-1: "buildah"
+    pipelinesascode.tekton.dev/task-1: "buildah-as-user"
 
     # You can add more tasks by increasing the suffix number, you can specify them as array to have multiple of them.
     # browse the tasks you want to include from hub on https://hub.tekton.dev/
@@ -26,7 +26,7 @@ metadata:
     # How many runs we want to keep attached to this event
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
-  # serviceAccountName: build-bot
+  serviceAccountName: pipelines-sa-userid-1000
   params:
     # The variable with brackets are special to Pipelines as Code
     # They will automatically be expanded with the events from Github.
@@ -64,7 +64,7 @@ spec:
         runAfter:
           - fetch-repository
         taskRef:
-          name: buildah
+          name: buildah-as-user
         params:
           - name: DOCKERFILE
             value: $(params.DOCKERFILE_PATH)
