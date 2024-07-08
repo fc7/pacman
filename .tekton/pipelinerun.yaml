@@ -44,6 +44,7 @@ spec:
     workspaces:
       - name: source
       - name: basic-auth
+      - name: dockerconfig-ws
     tasks:
       - name: fetch-repository
         taskRef:
@@ -51,8 +52,8 @@ spec:
         workspaces:
           - name: output
             workspace: source
-        - name: basic-auth
-          workspace: basic-auth
+          - name: basic-auth
+            workspace: basic-auth
         params:
           - name: url
             value: $(params.repo_url)
