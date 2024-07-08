@@ -1,3 +1,4 @@
 node_modules
 efi-variable-store
 _*.md
+.vscode/settings.json
