@@ -16,7 +16,7 @@ metadata:
     pipelinesascode.tekton.dev/task: "git-clone"
 
     # Task for buildah
-    pipelinesascode.tekton.dev/task-1: "buildah-as-user"
+    pipelinesascode.tekton.dev/task-1: "buildah"
 
     # You can add more tasks by increasing the suffix number, you can specify them as array to have multiple of them.
     # browse the tasks you want to include from hub on https://hub.tekton.dev/
@@ -26,7 +26,6 @@ metadata:
     # How many runs we want to keep attached to this event
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
-  serviceAccountName: pipelines-sa-userid-1000
   params:
     # The variable with brackets are special to Pipelines as Code
     # They will automatically be expanded with the events from Github.
@@ -45,11 +44,18 @@ spec:
     workspaces:
       - name: source
       - name: basic-auth
-      - name: dockerconfig-ws
+      # - name: dockerconfig-ws
     tasks:
       - name: fetch-repository
         taskRef:
-          name: git-clone
+          resolver: cluster
+          params:
+          - name: name
+            value: git-clone
+          - name: namespace
+            value: openshift-pipelines
+          - name: kind
+            value: Task
         workspaces:
           - name: output
             workspace: source
@@ -64,7 +70,14 @@ spec:
         runAfter:
           - fetch-repository
         taskRef:
-          name: buildah-as-user
+          resolver: cluster
+          params:
+          - name: name
+            value: buildah
+          - name: namespace
+            value: openshift-pipelines
+          - name: kind
+            value: Task          
         params:
           - name: DOCKERFILE
             value: $(params.DOCKERFILE_PATH)
@@ -77,8 +90,8 @@ spec:
         workspaces:
           - name: source
             workspace: source
-          - name: build-and-push
-            workspace: dockerconfig-ws
+          # - name: dockerconfig
+          #   workspace: dockerconfig
       # - name: run-test
       #   taskRef:
       #     name: npm
@@ -106,6 +119,6 @@ spec:
       secret:
         secretName: "{{ git_auth_secret }}"
     # This is needed to be able to push to quay.io:
-    - name: dockerconfig-ws
-      secret:
-        secretName: container-registry-secret    
+    # - name: dockerconfig
+    #   secret:
+    #     secretName: container-registry-secret    
