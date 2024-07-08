@@ -55,7 +55,7 @@ spec:
           - name: namespace
             value: openshift-pipelines
           - name: kind
-            value: Task
+            value: task
         workspaces:
           - name: output
             workspace: source
@@ -77,7 +77,7 @@ spec:
           - name: namespace
             value: openshift-pipelines
           - name: kind
-            value: Task          
+            value: task          
         params:
           - name: DOCKERFILE
             value: $(params.DOCKERFILE_PATH)
